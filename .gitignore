@@ -2,4 +2,5 @@
 .hgtags
 .hgignore
 dist/
+.stack-work/
 *.swp
