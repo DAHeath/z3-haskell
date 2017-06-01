@@ -1,0 +1,5 @@
+.hg/
+.hgtags
+.hgignore
+dist/
+*.swp
