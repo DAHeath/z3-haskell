@@ -2000,11 +2000,23 @@ modelEval ctx m a b =
         peekAST _p False = return Nothing
         peekAST  p True  = fmap Just . c2h ctx =<< peek p
 
-modelGetConstInterp :: Context -> Model -> FuncDecl -> IO Bool
-modelGetConstInterp = liftFun2 z3_model_get_const_interp
+modelGetConstInterp :: Context -> Model -> FuncDecl -> IO (Maybe AST)
+modelGetConstInterp ctx m fd = marshal z3_model_get_const_interp ctx $ \f ->
+  h2c m $ \mPtr ->
+  h2c fd $ \fdPtr ->
+    f mPtr fdPtr
 
 modelGetFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
 modelGetFuncInterp = getFuncInterp
+
+-- | Return the interpretation of the function f in the model m.
+-- Return NULL, if the model does not assign an interpretation for f.
+-- That should be interpreted as: the f does not matter.
+getFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
+getFuncInterp ctx m fd = marshal z3_model_get_func_interp ctx $ \f ->
+  h2c m $ \mPtr ->
+  h2c fd $ \fdPtr ->
+    f mPtr fdPtr
 
 modelHasInterp :: Context -> Model -> FuncDecl -> IO Bool
 modelHasInterp = liftFun2 z3_model_has_interp
@@ -2090,15 +2102,6 @@ getEntryArgs :: Context -> FuncEntry -> IO [AST]
 getEntryArgs ctx entry =
     do n <- funcEntryGetNumArgs ctx entry
        mapM (funcEntryGetArg ctx entry) [0..n-1]
-
--- | Return the interpretation of the function f in the model m.
--- Return NULL, if the model does not assign an interpretation for f.
--- That should be interpreted as: the f does not matter.
-getFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
-getFuncInterp ctx m fd = marshal z3_model_get_func_interp ctx $ \f ->
-  h2c m $ \mPtr ->
-  h2c fd $ \fdPtr ->
-    f mPtr fdPtr
 
 -- | Return the number of entries in the given function interpretation.
 funcInterpGetNumEntries :: Context -> FuncInterp -> IO Int

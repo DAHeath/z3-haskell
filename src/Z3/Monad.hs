@@ -254,6 +254,7 @@ module Z3.Monad
   -- * Models
   , modelEval
   , modelGetFuncInterp
+  , modelGetConstInterp
   , modelGetConstDecls
   , modelGetFuncDecls
   , modelGetSorts
@@ -1604,6 +1605,9 @@ modelEval = liftFun3 Base.modelEval
 
 modelGetFuncInterp :: MonadZ3 z3 => Model -> FuncDecl -> z3 (Maybe FuncInterp)
 modelGetFuncInterp = liftFun2 Base.modelGetFuncInterp
+
+modelGetConstInterp :: MonadZ3 z3 => Model -> FuncDecl -> z3 (Maybe AST)
+modelGetConstInterp = liftFun2 Base.modelGetConstInterp
 
 modelGetConstDecls :: MonadZ3 z3 => Model -> z3 [FuncDecl]
 modelGetConstDecls = liftFun1 Base.modelGetConstDecls

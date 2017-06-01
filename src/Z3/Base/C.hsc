@@ -950,7 +950,7 @@ foreign import ccall unsafe "Z3_model_eval"
                   -> IO Z3_bool
 
 foreign import ccall unsafe "Z3_model_get_const_interp"
-    z3_model_get_const_interp :: Ptr Z3_context -> Ptr Z3_model -> Ptr Z3_func_decl -> IO Z3_bool
+    z3_model_get_const_interp :: Ptr Z3_context -> Ptr Z3_model -> Ptr Z3_func_decl -> IO (Ptr Z3_ast)
 
 foreign import ccall unsafe "Z3_model_has_interp"
     z3_model_has_interp :: Ptr Z3_context -> Ptr Z3_model -> Ptr Z3_func_decl -> IO Z3_bool
