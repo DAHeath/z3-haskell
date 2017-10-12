@@ -227,6 +227,8 @@ module Z3.Monad
   , getAppArg
   , getAppArgs
   , getSort
+  , getArraySortDomain
+  , getArraySortRange
   , getBoolValue
   , getAstKind
   , getIndexValue
@@ -1494,6 +1496,12 @@ getAppArgs = liftFun1 Base.getAppArgs
 -- | Return the sort of an AST node.
 getSort :: MonadZ3 z3 => AST -> z3 Sort
 getSort = liftFun1 Base.getSort
+
+getArraySortDomain :: MonadZ3 z3 => Sort -> z3 Sort
+getArraySortDomain = liftFun1 Base.getArraySortDomain
+
+getArraySortRange :: MonadZ3 z3 => Sort -> z3 Sort
+getArraySortRange = liftFun1 Base.getArraySortRange
 
 -- | Returns @Just True@, @Just False@, or @Nothing@ for /undefined/.
 --

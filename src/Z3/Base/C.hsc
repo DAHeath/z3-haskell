@@ -859,6 +859,14 @@ foreign import ccall unsafe "Z3_app_to_ast"
 foreign import ccall unsafe "Z3_get_sort"
     z3_get_sort :: Ptr Z3_context -> Ptr Z3_ast -> IO (Ptr Z3_sort)
 
+-- | Reference: <https://z3prover.github.io/api/html/group__capi.html#ga6ffa46d55e4632d761db4dfae7441c09>
+foreign import ccall unsafe "Z3_get_array_sort_domain"
+    z3_get_array_sort_domain :: Ptr Z3_context -> Ptr Z3_sort -> IO (Ptr Z3_sort)
+
+-- | Reference: <https://z3prover.github.io/api/html/group__capi.html#gaa6f84f1b2b178f6fe5bc3b9a5762a73b>
+foreign import ccall unsafe "Z3_get_array_sort_range"
+    z3_get_array_sort_range :: Ptr Z3_context -> Ptr Z3_sort -> IO (Ptr Z3_sort)
+
 -- | Reference: <http://research.microsoft.com/en-us/um/redmond/projects/z3/group__capi.html#ga133aaa1ec31af9b570ed7627a3c8c5a4>
 foreign import ccall unsafe "Z3_get_bool_value"
     z3_get_bool_value :: Ptr Z3_context -> Ptr Z3_ast -> IO Z3_lbool

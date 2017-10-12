@@ -266,6 +266,8 @@ module Z3.Base (
   , getAppArg
   , getAppArgs
   , getSort
+  , getArraySortDomain
+  , getArraySortRange
   , getBoolValue
   , getAstKind
   , getIndexValue
@@ -1648,11 +1650,13 @@ getSymbolString = liftFun1 z3_get_symbol_string
 getBvSortSize :: Context -> Sort -> IO Int
 getBvSortSize = liftFun1 z3_get_bv_sort_size
 
+getArraySortDomain :: Context -> Sort -> IO Sort
+getArraySortDomain = liftFun1 z3_get_array_sort_domain
+
+getArraySortRange :: Context -> Sort -> IO Sort
+getArraySortRange = liftFun1 z3_get_array_sort_range
+
 -- TODO: Z3_get_finite_domain_sort_size
-
--- TODO: Z3_get_array_sort_size
-
--- TODO: Z3_get_array_sort_range
 
 -- TODO: Z3_get_tuple_sort_mk_decl
 
