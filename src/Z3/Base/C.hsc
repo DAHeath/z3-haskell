@@ -1244,6 +1244,12 @@ foreign import ccall unsafe "Z3_tactic_skip"
 foreign import ccall unsafe "Z3_tactic_try_for"
     z3_tactic_try_for :: Ptr Z3_context -> Ptr Z3_tactic -> CUInt -> IO (Ptr Z3_tactic)
 
+foreign import ccall unsafe "Z3_tactic_par_and_then"
+    z3_tactic_par_and_then :: Ptr Z3_context -> Ptr Z3_tactic -> Ptr Z3_tactic -> IO (Ptr Z3_tactic)
+
+foreign import ccall unsafe "Z3_tactic_repeat"
+    z3_tactic_repeat :: Ptr Z3_context -> Ptr Z3_tactic -> CUInt -> IO (Ptr Z3_tactic)
+
 -- | Reference: <https://z3prover.github.io/api/html/group__capi.html#gabd0874d8777b3bc426782a87c04206b9>
 foreign import ccall unsafe "Z3_tactic_inc_ref"
     z3_tactic_inc_ref :: Ptr Z3_context -> Ptr Z3_tactic -> IO ()

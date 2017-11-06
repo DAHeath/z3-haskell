@@ -302,6 +302,8 @@ module Z3.Monad
   , orElseTactic
   , skipTactic
   , tryForTactic
+  , parAndThenTactic
+  , repeatTactic
   , mkQuantifierEliminationTactic
   , mkAndInverterGraphTactic
   , applyTactic
@@ -1858,6 +1860,12 @@ skipTactic = liftScalar Base.skipTactic
 
 tryForTactic :: MonadZ3 z3 => Tactic -> Int -> z3 Tactic
 tryForTactic = liftFun2 Base.tryForTactic
+
+parAndThenTactic :: MonadZ3 z3 => Tactic -> Tactic -> z3 Tactic
+parAndThenTactic = liftFun2 Base.parAndThenTactic
+
+repeatTactic :: MonadZ3 z3 => Tactic -> Int -> z3 Tactic
+repeatTactic = liftFun2 Base.repeatTactic
 
 mkQuantifierEliminationTactic :: MonadZ3 z3 => z3 Tactic
 mkQuantifierEliminationTactic = liftScalar Base.mkQuantifierEliminationTactic
