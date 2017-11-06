@@ -326,6 +326,21 @@ module Z3.Monad
   , Version(..)
   , getVersion
 
+  -- *
+  , Fixedpoint
+  , fixedpointPush
+  , fixedpointPop
+  , fixedpointAddRule
+  , fixedpointSetParams
+  , fixedpointRegisterRelation
+  , fixedpointRegisterVariable
+  , fixedpointQueryRelations
+  , fixedpointGetAnswer
+  , fixedpointGetAssertions
+  , fixedpointGetRefutation
+  , fixedpointDisplayCertificate
+  , fixedpointGetModel
+
   -- * Interpolation
   , Base.InterpolationProblem(..)
   , mkInterpolant
@@ -387,6 +402,7 @@ import Z3.Base
   , Version(..)
   , Params
   , Solver
+  , Fixedpoint
   , SortKind(..)
   , ASTKind(..)
   , Tactic
@@ -409,8 +425,9 @@ import qualified Data.Traversable as T
 -- The Z3 monad-class
 
 class (Applicative m, Monad m, MonadIO m) => MonadZ3 m where
-  getSolver  :: m Base.Solver
-  getContext :: m Base.Context
+  getSolver     :: m Base.Solver
+  getContext    :: m Base.Context
+  getFixedpoint :: m Base.Fixedpoint
 
 -------------------------------------------------
 -- Lifting
@@ -460,6 +477,27 @@ liftSolver2 f a b = do
   slv <- getSolver
   liftIO $ f ctx slv a b
 
+liftFixedpoint0 :: MonadZ3 z3 =>
+       (Base.Context -> Base.Fixedpoint -> IO b)
+    -> z3 b
+liftFixedpoint0 f_s =
+  do ctx <- getContext
+     liftIO . f_s ctx =<< getFixedpoint
+
+liftFixedpoint1 :: MonadZ3 z3 =>
+       (Base.Context -> Base.Fixedpoint -> a -> IO b)
+    -> a -> z3 b
+liftFixedpoint1 f_s a =
+  do ctx <- getContext
+     liftIO . (\s -> f_s ctx s a) =<< getFixedpoint
+
+liftFixedpoint2 :: MonadZ3 z3 => (Base.Context -> Base.Fixedpoint -> a -> b -> IO c)
+                             -> a -> b -> z3 c
+liftFixedpoint2 f a b = do
+  ctx <- getContext
+  slv <- getFixedpoint
+  liftIO $ f ctx slv a b
+
 -------------------------------------------------
 -- A simple Z3 monad.
 
@@ -469,13 +507,15 @@ newtype Z3 a = Z3 { _unZ3 :: ReaderT Z3Env IO a }
 -- | Z3 environment.
 data Z3Env
   = Z3Env {
-      envSolver  :: Base.Solver
-    , envContext :: Base.Context
+      envSolver     :: Base.Solver
+    , envContext    :: Base.Context
+    , envFixedpoint :: Base.Fixedpoint
     }
 
 instance MonadZ3 Z3 where
-  getSolver  = Z3 $ asks envSolver
-  getContext = Z3 $ asks envContext
+  getSolver     = Z3 $ asks envSolver
+  getContext    = Z3 $ asks envContext
+  getFixedpoint = Z3 $ asks envFixedpoint
 
 -- | Eval a Z3 script.
 evalZ3With :: Maybe Logic -> Opts -> Z3 a -> IO a
@@ -494,7 +534,8 @@ newEnvWith mkContext mbLogic opts =
     setOpts cfg opts
     ctx <- mkContext cfg
     solver <- maybe (Base.mkSolver ctx) (Base.mkSolverForLogic ctx) mbLogic
-    return $ Z3Env solver ctx
+    fixedpoint <- Base.mkFixedpoint ctx
+    return $ Z3Env solver ctx fixedpoint
 
 -- | Create a new Z3 environment.
 newEnv :: Maybe Logic -> Opts -> IO Z3Env
@@ -1876,6 +1917,45 @@ benchmarkToSMTLibString = liftFun6 Base.benchmarkToSMTLibString
 -- | Return Z3 version number information.
 getVersion :: MonadZ3 z3 => z3 Version
 getVersion = liftIO Base.getVersion
+
+---------------------------------------------------------------------
+-- Fixedpoint
+
+fixedpointPush :: MonadZ3 z3 => z3 ()
+fixedpointPush = liftFixedpoint0 Base.fixedpointPush
+
+fixedpointPop :: MonadZ3 z3 => z3 ()
+fixedpointPop = liftFixedpoint0 Base.fixedpointPush
+
+fixedpointAddRule :: MonadZ3 z3 => AST -> Symbol -> z3 ()
+fixedpointAddRule = liftFixedpoint2 Base.fixedpointAddRule
+
+fixedpointSetParams :: MonadZ3 z3 => Params -> z3 ()
+fixedpointSetParams = liftFixedpoint1 Base.fixedpointSetParams
+
+fixedpointRegisterRelation :: MonadZ3 z3 => FuncDecl -> z3 ()
+fixedpointRegisterRelation = liftFixedpoint1 Base.fixedpointRegisterRelation
+
+fixedpointRegisterVariable :: MonadZ3 z3 => FuncDecl -> z3 ()
+fixedpointRegisterVariable = liftFixedpoint1 Base.fixedpointRegisterVariable
+
+fixedpointQueryRelations :: MonadZ3 z3 => [FuncDecl] -> z3 Result
+fixedpointQueryRelations = liftFixedpoint1 Base.fixedpointQueryRelations
+
+fixedpointGetAnswer :: MonadZ3 z3 => z3 AST
+fixedpointGetAnswer = liftFixedpoint0 Base.fixedpointGetAnswer
+
+fixedpointGetAssertions :: MonadZ3 z3 => z3 [AST]
+fixedpointGetAssertions = liftFixedpoint0 Base.fixedpointGetAssertions
+
+fixedpointGetRefutation :: MonadZ3 z3 => z3 Model
+fixedpointGetRefutation = liftFixedpoint0 Base.fixedpointGetRefutation
+
+fixedpointDisplayCertificate :: MonadZ3 z3 => z3 ()
+fixedpointDisplayCertificate = liftFixedpoint0 Base.fixedpointDisplayCertificate
+
+fixedpointGetModel :: MonadZ3 z3 => z3 Model
+fixedpointGetModel = liftFixedpoint0 Base.fixedpointGetModel
 
 
 ---------------------------------------------------------------------

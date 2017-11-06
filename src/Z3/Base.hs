@@ -367,6 +367,22 @@ module Z3.Base (
   , Version(..)
   , getVersion
 
+  -- * Fixedpoint
+  , Fixedpoint (..)
+  , mkFixedpoint
+  , fixedpointPush
+  , fixedpointPop
+  , fixedpointAddRule
+  , fixedpointSetParams
+  , fixedpointRegisterRelation
+  , fixedpointRegisterVariable
+  , fixedpointQueryRelations
+  , fixedpointGetAnswer
+  , fixedpointGetAssertions
+  , fixedpointGetRefutation
+  , fixedpointDisplayCertificate
+  , fixedpointGetModel
+
   -- * Interpolation
   , InterpolationProblem(..)
   , mkInterpolant
@@ -2446,7 +2462,55 @@ getVersion =
 ---------------------------------------------------------------------
 -- Fixedpoint facilities
 
--- TODO
+newtype Fixedpoint = Fixedpoint { unFixedpoint :: ForeignPtr Z3_fixedpoint }
+    deriving Eq
+
+instance Marshal Fixedpoint (Ptr Z3_fixedpoint) where
+  c2h = mkC2hRefCount Fixedpoint z3_fixedpoint_inc_ref z3_fixedpoint_dec_ref
+  h2c fp = withForeignPtr (unFixedpoint fp)
+
+mkFixedpoint :: Context -> IO Fixedpoint
+mkFixedpoint = liftFun0 z3_mk_fixedpoint
+
+fixedpointPush :: Context -> Fixedpoint -> IO ()
+fixedpointPush = liftFun1 z3_fixedpoint_push
+
+fixedpointPop :: Context -> Fixedpoint -> IO ()
+fixedpointPop = liftFun1 z3_fixedpoint_pop
+
+fixedpointAddRule :: Context -> Fixedpoint -> AST -> Symbol -> IO ()
+fixedpointAddRule = liftFun3 z3_fixedpoint_add_rule
+
+fixedpointSetParams :: Context -> Fixedpoint -> Params -> IO ()
+fixedpointSetParams = liftFun2 z3_fixedpoint_set_params
+
+fixedpointRegisterRelation :: Context -> Fixedpoint -> FuncDecl -> IO ()
+fixedpointRegisterRelation = liftFun2 z3_fixedpoint_register_relation
+
+fixedpointRegisterVariable :: Context -> Fixedpoint -> FuncDecl -> IO ()
+fixedpointRegisterVariable = liftFun2 z3_fixedpoint_register_variable
+
+fixedpointQueryRelations :: Context -> Fixedpoint -> [FuncDecl] -> IO Result
+fixedpointQueryRelations ctx fixedpoint fds =
+  marshal z3_fixedpoint_query_relations ctx $ \f ->
+    h2c fixedpoint $ \fixedpointPtr ->
+    marshalArrayLen fds $ \fdsNum fdsArr ->
+      f fixedpointPtr fdsNum fdsArr
+
+fixedpointGetAnswer :: Context -> Fixedpoint -> IO AST
+fixedpointGetAnswer = liftFun1 z3_fixedpoint_get_answer
+
+fixedpointGetAssertions :: Context -> Fixedpoint -> IO [AST]
+fixedpointGetAssertions = liftFun1 z3_fixedpoint_get_assertions
+
+fixedpointGetRefutation :: Context -> Fixedpoint -> IO Model
+fixedpointGetRefutation = liftFun1 z3_fixedpoint_get_refutation
+
+fixedpointDisplayCertificate :: Context -> Fixedpoint -> IO ()
+fixedpointDisplayCertificate = liftFun1 z3_fixedpoint_display_certificate
+
+fixedpointGetModel :: Context -> Fixedpoint -> IO Model
+fixedpointGetModel = liftFun1 z3_fixedpoint_get_model
 
 -- AST vectors ?
 
