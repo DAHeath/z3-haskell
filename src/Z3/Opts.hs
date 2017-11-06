@@ -50,6 +50,7 @@ import qualified Z3.Base as Base
 
 import           Data.Fixed  ( Fixed )
 import qualified Data.Fixed as Fixed
+import           Data.Monoid ( Monoid(..) )
 
 ---------------------------------------------------------------------
 -- Configuration

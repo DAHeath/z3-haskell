@@ -1,6 +1,24 @@
 
 # Release Notes
 
+## 4.1.2
+
+This minor release extends the supported quantifiers API, and adds
+partial support for Z3's proof tactics.
+
+* Improved support for theorem proving with quantifiers. (Jakub Daniel)
+
+## 4.1.1
+
+Another small release, made possible thanks to third-party contributions.
+
+* Added bindings for getting the accessors of datatype constructors. (William Hallahan)
+* Added bindings for declaring mutually recursive datatypes. (William Hallahan)
+* Added partial support for the _Interpolation_ API. (Jakub Daniel)
+* Added bindings for deconstructing function applications. (Jakub Daniel)
+* Added bindings for ```simplify``` and ```simplifyEx```. (Gleb Popov)
+* Some code cleanup. (Jakub Daniel and Iago Abal)
+
 ## 4.1.0
 
 Small maintenance release that however introduces one API breaking change.

@@ -13,7 +13,7 @@
 -- Low-level bindings to Z3 API.
 --
 -- There is (mostly) a one-to-one correspondence with Z3 C API, thus see
--- <http://research.microsoft.com/en-us/um/redmond/projects/z3/group__capi.html>
+-- <http://z3prover.github.io/api/html/group__capi.html>
 -- for further details.
 
 {- HACKING
@@ -68,7 +68,11 @@ module Z3.Base (
   , FuncEntry
   , Params
   , Solver
+  , SortKind(..)
   , ASTKind(..)
+  , Tactic
+  , ApplyResult
+  , Goal
   -- ** Satisfiability result
   , Result(..)
 
@@ -76,7 +80,6 @@ module Z3.Base (
   , mkConfig
   , delConfig
   , setParamValue
-  , globalParamSet
   -- ** Helpers
   , withConfig
 
@@ -97,7 +100,6 @@ module Z3.Base (
   , mkStringSymbol
 
   -- * Sorts
-  , SortKind(..)
   , mkUninterpretedSort
   , mkBoolSort
   , mkIntSort
@@ -109,7 +111,6 @@ module Z3.Base (
   , mkDatatype
   , mkDatatypes
   , mkSetSort
-  , getSortKind
 
   -- * Constants and Applications
   , mkFuncDecl
@@ -256,10 +257,15 @@ module Z3.Base (
 
   -- * Accessors
   , getSymbolString
+  , getSortKind
   , getBvSortSize
   , getDatatypeSortConstructors
   , getDatatypeSortRecognizers
+  , getDatatypeSortConstructorAccessors
   , getDeclName
+  , getArity
+  , getDomain
+  , getRange
   , appToAst
   , getAppDecl
   , getAppNumArgs
@@ -270,44 +276,37 @@ module Z3.Base (
   , getArraySortRange
   , getBoolValue
   , getAstKind
-  , getIndexValue
   , isApp
   , toApp
-  , toFuncDecl
   , getNumeralString
-  , isQuantifierForall
-  , getQuantifierWeight
-  , getQuantifierNumBound
-  , getQuantifierBoundName
-  , getQuantifierBoundNames
-  , getQuantifierBoundSort
-  , getQuantifierBoundSorts
-  , getQuantifierBindings
-  , getQuantifierBody
-
   , simplify
   , simplifyEx
+  , getIndexValue
+  , isQuantifierForall
+  , isQuantifierExists
+  , getQuantifierWeight
+  , getQuantifierNumPatterns
+  , getQuantifierPatternAST
+  , getQuantifierPatterns
+  , getQuantifierNumNoPatterns
+  , getQuantifierNoPatternAST
+  , getQuantifierNoPatterns
+  , getQuantifierNumBound
+  , getQuantifierBoundName
+  , getQuantifierBoundSort
+  , getQuantifierBoundVars
+  , getQuantifierBody
   -- ** Helpers
   , getBool
   , getInt
   , getReal
   , getBv
 
+  -- * Modifiers
+  , substituteVars
+
   -- * Models
   , modelEval
-  , modelGetConstInterp
-  , modelHasInterp
-  , modelGetFuncInterp
-  , modelGetNumConsts
-  , modelGetConstDecl
-  , modelGetConstDecls
-  , modelGetNumFuncs
-  , modelGetFuncDecl
-  , modelGetFuncDecls
-  , modelGetNumSorts
-  , modelGetSort
-  , modelGetSorts
-  , modelGetSortUniverse
   , evalArray
   , getFuncInterp
   , isAsArray
@@ -333,6 +332,24 @@ module Z3.Base (
   , FuncModel (..)
   , evalFunc
 
+  -- * Tactics
+  , mkTactic
+  , andThenTactic
+  , orElseTactic
+  , skipTactic
+  , tryForTactic
+  , mkQuantifierEliminationTactic
+  , mkAndInverterGraphTactic
+  , applyTactic
+  , getApplyResultNumSubgoals
+  , getApplyResultSubgoal
+  , getApplyResultSubgoals
+  , mkGoal
+  , goalAssert
+  , getGoalSize
+  , getGoalFormula
+  , getGoalFormulas
+
   -- * String Conversion
   , ASTPrintMode(..)
   , setASTPrintMode
@@ -349,22 +366,6 @@ module Z3.Base (
   -- * Miscellaneous
   , Version(..)
   , getVersion
-
-  -- * Fixedpoint
-  , Fixedpoint (..)
-  , mkFixedpoint
-  , fixedpointPush
-  , fixedpointPop
-  , fixedpointAddRule
-  , fixedpointSetParams
-  , fixedpointRegisterRelation
-  , fixedpointRegisterVariable
-  , fixedpointQueryRelations
-  , fixedpointGetAnswer
-  , fixedpointGetAssertions
-  , fixedpointGetRefutation
-  , fixedpointDisplayCertificate
-  , fixedpointGetModel
 
   -- * Interpolation
   , InterpolationProblem(..)
@@ -398,12 +399,11 @@ module Z3.Base (
   , solverToString
   -- ** Helpers
   , solverCheckAndGetModel
-  , getRange
-  , getDomain
   ) where
 
 import Z3.Base.C
 
+import Control.Applicative ( (<$>), (<*>), (<*), pure )
 import Control.Exception ( Exception, bracket, throw )
 import Control.Monad ( join, when, (>=>) )
 import Data.Fixed ( Fixed, HasResolution )
@@ -411,6 +411,7 @@ import Data.Int
 import Data.IORef ( IORef, newIORef, atomicModifyIORef' )
 import Data.Maybe ( fromJust )
 import Data.Ratio ( numerator, denominator, (%) )
+import Data.Traversable ( Traversable )
 import qualified Data.Traversable as T
 import Data.Typeable ( Typeable )
 import Data.Word
@@ -485,6 +486,18 @@ newtype FuncInterp = FuncInterp { unFuncInterp :: ForeignPtr Z3_func_interp }
 newtype FuncEntry = FuncEntry { unFuncEntry :: ForeignPtr Z3_func_entry }
     deriving Eq
 
+-- | A tactic
+newtype Tactic = Tactic { unTactic :: ForeignPtr Z3_tactic }
+    deriving Eq
+
+-- | A goal (aka problem)
+newtype Goal = Goal { unGoal :: ForeignPtr Z3_goal }
+    deriving Eq
+
+-- | A result of applying a tactic
+newtype ApplyResult = ApplyResult { unApplyResult :: ForeignPtr Z3_apply_result }
+    deriving Eq
+
 -- | A Z3 parameter set.
 --
 -- Starting at Z3 4.0, parameter sets are used to configure many components
@@ -508,16 +521,7 @@ data Result
     | Undef
     deriving (Eq, Ord, Read, Show)
 
--- | Different kinds of Z3 AST nodes.
-data ASTKind
-    = Z3_NUMERAL_AST
-    | Z3_APP_AST
-    | Z3_VAR_AST
-    | Z3_QUANTIFIER_AST
-    | Z3_SORT_AST
-    | Z3_FUNC_DECL_AST
-    | Z3_UNKNOWN_AST
-
+-- | Different kinds of Z3 types.
 data SortKind
     = Z3_UNINTERPRETED_SORT
     | Z3_BOOL_SORT
@@ -531,21 +535,23 @@ data SortKind
     | Z3_FLOATING_POINT_SORT
     | Z3_ROUNDING_MODE_SORT
     | Z3_UNKNOWN_SORT
+    deriving (Eq, Show)
+
+-- | Different kinds of Z3 AST nodes.
+data ASTKind
+    = Z3_NUMERAL_AST
+    | Z3_APP_AST
+    | Z3_VAR_AST
+    | Z3_QUANTIFIER_AST
+    | Z3_SORT_AST
+    | Z3_FUNC_DECL_AST
+    | Z3_UNKNOWN_AST
+    deriving (Eq, Show)
 
 ---------------------------------------------------------------------
 -- * Configuration
 
--- liftFun2 :: (Marshal ah ac, Marshal bh bc, Marshal rh rc) =>
---               (Ptr Z3_context -> ac -> bc -> IO rc) ->
---               Context -> ah -> bh -> IO rh
--- liftFun2 f c x y = h2c x $ \a -> h2c y $ \b ->
---   toHsCheckError c $ \cPtr -> f cPtr a b
-
-globalParamSet :: String -> String -> IO ()
-globalParamSet pid pval =
-  withCString pid $ \pid' ->
-    withCString pval $ \pval' ->
-      z3_global_param_set pid' pval'
+-- TODO: Z3_global_param_set
 -- TODO: Z3_global_param_reset_all
 -- TODO: Z3_global_param_get
 
@@ -1515,7 +1521,7 @@ mkPattern c es = marshal z3_mk_pattern c $ marshalArrayLen es
 --
 -- Bound variables are indexed by de-Bruijn indices.
 --
--- See <http://research.microsoft.com/en-us/um/redmond/projects/z3/group__capi.html#ga1d4da8849fca699b345322f8ee1fa31e>
+-- See <http://z3prover.github.io/api/html/group__capi.html#ga1d4da8849fca699b345322f8ee1fa31e>
 mkBound :: Context
             -> Int    -- ^ de-Bruijn index.
             -> Sort
@@ -1644,11 +1650,33 @@ getSymbolString = liftFun1 z3_get_symbol_string
 
 -- TODO: Z3_is_eq_sort
 
--- TODO: Z3_get_sort_kind
+-- | Return the sort kind of the given sort.
+getSortKind :: Context -> Sort -> IO SortKind
+getSortKind ctx sort = toSortKind <$> liftFun1 z3_get_sort_kind ctx sort
+  where toSortKind :: Z3_sort_kind -> SortKind
+        toSortKind k
+          | k == z3_uninterpreted_sort      = Z3_UNINTERPRETED_SORT
+          | k == z3_bool_sort               = Z3_BOOL_SORT
+          | k == z3_int_sort                = Z3_INT_SORT
+          | k == z3_real_sort               = Z3_REAL_SORT
+          | k == z3_bv_sort                 = Z3_BV_SORT
+          | k == z3_array_sort              = Z3_ARRAY_SORT
+          | k == z3_datatype_sort           = Z3_DATATYPE_SORT
+          | k == z3_relation_sort           = Z3_RELATION_SORT
+          | k == z3_finite_domain_sort      = Z3_FINITE_DOMAIN_SORT
+          | k == z3_floating_point_sort     = Z3_FLOATING_POINT_SORT
+          | k == z3_rounding_mode_sort      = Z3_ROUNDING_MODE_SORT
+          | k == z3_unknown_sort            = Z3_UNKNOWN_SORT
+          | otherwise                 =
+              error "Z3.Base.getSortKind: unknown `Z3_sort_kind'"
 
 -- | Return the size of the given bit-vector sort.
 getBvSortSize :: Context -> Sort -> IO Int
 getBvSortSize = liftFun1 z3_get_bv_sort_size
+
+-- TODO: Z3_get_finite_domain_sort_size
+
+-- TODO: Z3_get_array_sort_size
 
 getArraySortDomain :: Context -> Sort -> IO Sort
 getArraySortDomain = liftFun1 z3_get_array_sort_domain
@@ -1656,15 +1684,12 @@ getArraySortDomain = liftFun1 z3_get_array_sort_domain
 getArraySortRange :: Context -> Sort -> IO Sort
 getArraySortRange = liftFun1 z3_get_array_sort_range
 
--- TODO: Z3_get_finite_domain_sort_size
-
 -- TODO: Z3_get_tuple_sort_mk_decl
 
 -- TODO: Z3_get_tuple_sort_num_fields
 
 -- TODO: Z3_get_tuple_sort_field_decl
 
--- TODO: Needs proper review
 -- | Get list of constructors for datatype.
 getDatatypeSortConstructors :: Context
                             -> Sort           -- ^ Datatype sort.
@@ -1672,13 +1697,12 @@ getDatatypeSortConstructors :: Context
 getDatatypeSortConstructors c dtSort =
   withContextError c $ \cPtr ->
   h2c dtSort $ \dtSortPtr -> do
-  numCons <- checkError cPtr $ z3_get_datatype_sort_num_constructors cPtr dtSortPtr
-  T.mapM (getConstructor dtSortPtr) [0..(numCons-1)]
+    numCons <- checkError cPtr $ z3_get_datatype_sort_num_constructors cPtr dtSortPtr
+    T.mapM (getConstructor dtSortPtr) [0..(numCons-1)]
   where
-    getConstructor dtSortPtr idx = do
+    getConstructor dtSortPtr idx =
       toHsCheckError c $ \cPtr -> z3_get_datatype_sort_constructor cPtr dtSortPtr idx
 
--- TODO: Needs proper review
 -- | Get list of recognizers for datatype.
 getDatatypeSortRecognizers :: Context
                            -> Sort           -- ^ Datatype sort.
@@ -1686,14 +1710,34 @@ getDatatypeSortRecognizers :: Context
 getDatatypeSortRecognizers c dtSort =
   withContextError c $ \cPtr ->
   h2c dtSort $ \dtSortPtr -> do
-  numCons <- checkError cPtr $ z3_get_datatype_sort_num_constructors cPtr dtSortPtr
-  T.mapM (getConstructor dtSortPtr) [0..(numCons-1)]
+    numCons <- checkError cPtr $ z3_get_datatype_sort_num_constructors cPtr dtSortPtr
+    T.mapM (getRecognizer dtSortPtr) [0..(numCons-1)]
   where
-    -- TODO: Maybe this should be renamed to getRecognizer :-)
-    getConstructor dtSortPtr idx = do
+    getRecognizer dtSortPtr idx =
       toHsCheckError c $ \cPtr -> z3_get_datatype_sort_recognizer cPtr dtSortPtr idx
 
--- TODO: Z3_get_datatype_sort_constructor_accessor
+-- | Get list of accessors for the datatype constructor.
+getDatatypeSortConstructorAccessors :: Context
+                                    -> Sort             -- ^ Datatype sort.
+                                    -> IO [[FuncDecl]]  -- ^ Constructor accessors.
+getDatatypeSortConstructorAccessors c dtSort =
+  withContextError c $ \cPtr ->
+  h2c dtSort $ \dtSortPtr -> do
+    numCons <- checkError cPtr $ z3_get_datatype_sort_num_constructors cPtr dtSortPtr
+    T.mapM (getAccessors dtSortPtr) [0..(numCons-1)]
+  where
+    getConstructor dtSortPtr idx_c =
+      withContext c $ \cPtr -> z3_get_datatype_sort_constructor cPtr dtSortPtr idx_c
+
+    getAccessors dtSortPtr idx_c = do
+      consPtr <- getConstructor dtSortPtr idx_c
+      numAs <- toHsCheckError c $ \cPtr -> z3_get_arity cPtr consPtr
+      if numAs > 0  -- NB: (0::CUInt) - 1 == 0
+        then T.mapM (\idx_a -> getAccessors' dtSortPtr idx_c idx_a) [0..(numAs - 1)]
+        else return []
+
+    getAccessors' dtSortPtr idx_c idx_a =
+      toHsCheckError c $ \cPtr -> z3_get_datatype_sort_constructor_accessor cPtr dtSortPtr idx_c idx_a
 
 -- TODO: Z3_get_relation_arity
 
@@ -1714,7 +1758,20 @@ getDeclName c decl = h2c decl $ \declPtr ->
 
 -- TODO: Z3_get_domain_size
 
--- TODO: Z3_get_range
+-- | Returns the number of parameters of the given declaration
+getArity :: Context -> FuncDecl -> IO Int
+getArity = liftFun1 z3_get_arity
+
+-- | Returns the sort of the i-th parameter of the given function declaration
+getDomain :: Context
+             -> FuncDecl         -- ^ A function declaration
+             -> Int              -- ^ i
+             -> IO Sort
+getDomain = liftFun2 z3_get_domain
+
+-- | Returns the range of the given declaration.
+getRange :: Context -> FuncDecl -> IO Sort
+getRange = liftFun1 z3_get_range
 
 -- TODO: Z3_get_decl_num_parameters
 
@@ -1797,28 +1854,6 @@ getAstKind ctx ast = toAstKind <$> liftFun1 z3_get_ast_kind ctx ast
           | otherwise                 =
               error "Z3.Base.getAstKind: unknown `Z3_ast_kind'"
 
-getIndexValue :: Context -> AST -> IO Int
-getIndexValue = liftFun1 z3_get_index_value
-
-getSortKind :: Context -> Sort -> IO SortKind
-getSortKind ctx sort = toSortKind <$> liftFun1 z3_get_sort_kind ctx sort
-  where toSortKind :: Z3_sort_kind -> SortKind
-        toSortKind k
-          | k == z3_uninterpreted_sort  = Z3_UNINTERPRETED_SORT
-          | k == z3_bool_sort           = Z3_BOOL_SORT
-          | k == z3_int_sort            = Z3_INT_SORT
-          | k == z3_real_sort           = Z3_REAL_SORT
-          | k == z3_bv_sort             = Z3_BV_SORT
-          | k == z3_array_sort          = Z3_ARRAY_SORT
-          | k == z3_datatype_sort       = Z3_DATATYPE_SORT
-          | k == z3_relation_sort       = Z3_RELATION_SORT
-          | k == z3_finite_domain_sort  = Z3_FINITE_DOMAIN_SORT
-          | k == z3_floating_point_sort = Z3_FLOATING_POINT_SORT
-          | k == z3_rounding_mode_sort  = Z3_ROUNDING_MODE_SORT
-          | k == z3_unknown_sort        = Z3_UNKNOWN_SORT
-          | otherwise                   =
-              error "Z3.Base.getSortKind: unknown `Z3_sort_kind'"
-
 -- | Return True if an ast is APP_AST, False otherwise.
 isApp :: Context -> AST -> IO Bool
 isApp = liftFun1 z3_is_app
@@ -1830,9 +1865,6 @@ isApp = liftFun1 z3_is_app
 -- | Convert an ast into an APP_AST. This is just type casting.
 toApp :: Context -> AST -> IO App
 toApp = liftFun1 z3_to_app
-
-toFuncDecl :: Context -> AST -> IO FuncDecl
-toFuncDecl = liftFun1 z3_to_func_decl
 
 -- TODO: Z3_to_func_decl
 
@@ -1870,13 +1902,39 @@ getNumeralString = liftFun1 z3_get_numeral_string
 
 -- TODO: Z3_get_pattern
 
--- TODO: Z3_get_index_value
+getIndexValue :: Context -> AST -> IO Int
+getIndexValue = liftFun1 z3_get_index_value
 
 isQuantifierForall :: Context -> AST -> IO Bool
 isQuantifierForall = liftFun1 z3_is_quantifier_forall
 
+isQuantifierExists :: Context -> AST -> IO Bool
+isQuantifierExists ctx = fmap not . isQuantifierForall ctx
+
 getQuantifierWeight :: Context -> AST -> IO Int
 getQuantifierWeight = liftFun1 z3_get_quantifier_weight
+
+getQuantifierNumPatterns :: Context -> AST -> IO Int
+getQuantifierNumPatterns = liftFun1 z3_get_quantifier_num_patterns
+
+getQuantifierPatternAST :: Context -> AST -> Int -> IO AST
+getQuantifierPatternAST = liftFun2 z3_get_quantifier_pattern_ast
+
+getQuantifierPatterns :: Context -> AST -> IO [AST]
+getQuantifierPatterns ctx a = do
+  n <- getQuantifierNumPatterns ctx a
+  T.forM [0..n-1] (getQuantifierPatternAST ctx a)
+
+getQuantifierNumNoPatterns :: Context -> AST -> IO Int
+getQuantifierNumNoPatterns = liftFun1 z3_get_quantifier_num_no_patterns
+
+getQuantifierNoPatternAST :: Context -> AST -> Int -> IO AST
+getQuantifierNoPatternAST = liftFun2 z3_get_quantifier_no_pattern_ast
+
+getQuantifierNoPatterns :: Context -> AST -> IO [AST]
+getQuantifierNoPatterns ctx a = do
+  n <- getQuantifierNumNoPatterns ctx a
+  T.forM [0..n-1] (getQuantifierNoPatternAST ctx a)
 
 getQuantifierNumBound :: Context -> AST -> IO Int
 getQuantifierNumBound = liftFun1 z3_get_quantifier_num_bound
@@ -1884,51 +1942,19 @@ getQuantifierNumBound = liftFun1 z3_get_quantifier_num_bound
 getQuantifierBoundName :: Context -> AST -> Int -> IO Symbol
 getQuantifierBoundName = liftFun2 z3_get_quantifier_bound_name
 
-getQuantifierBoundNames :: Context -> AST -> IO [Symbol]
-getQuantifierBoundNames ctx a = do
-  n <- getQuantifierNumBound ctx a
-  T.forM [0..n-1] (getQuantifierBoundName ctx a)
-
 getQuantifierBoundSort :: Context -> AST -> Int -> IO Sort
 getQuantifierBoundSort = liftFun2 z3_get_quantifier_bound_sort
 
-getQuantifierBoundSorts :: Context -> AST -> IO [Sort]
-getQuantifierBoundSorts ctx a = do
+getQuantifierBoundVars :: Context -> AST -> IO [AST]
+getQuantifierBoundVars ctx a = do
   n <- getQuantifierNumBound ctx a
-  T.forM [0..n-1] (getQuantifierBoundSort ctx a)
-
-getQuantifierBindings :: Context -> AST -> IO [(Symbol, Sort)]
-getQuantifierBindings ctx a = do
-  names <- getQuantifierBoundNames ctx a
-  sorts <- getQuantifierBoundSorts ctx a
-  return $ zip names sorts
+  T.forM [0..n-1] $ \i -> do
+    b <- getQuantifierBoundName ctx a i
+    s <- getQuantifierBoundSort ctx a i
+    mkVar ctx b s
 
 getQuantifierBody :: Context -> AST -> IO AST
 getQuantifierBody = liftFun1 z3_get_quantifier_body
-
--- getAppArgs :: Context -> App -> IO [AST]
--- getAppArgs ctx a = do
---   n <- getAppNumArgs ctx a
---   T.forM [0..n-1] (getAppArg ctx a)
-
-
--- TODO: Z3_get_quantifier_weight
-
--- TODO: Z3_get_quantifier_num_patterns
-
--- TODO: Z3_get_quantifier_pattern_ast
-
--- TODO: Z3_get_quantifier_num_no_patterns
-
--- TODO: Z3_get_quantifier_no_pattern_ast
-
--- TODO: Z3_get_quantifier_num_bound
-
--- TODO: Z3_get_quantifier_bound_name
-
--- TODO: Z3_get_quantifier_bound_sort
-
--- TODO: Z3_get_quantifier_body
 
 simplify :: Context -> AST -> IO AST
 simplify = liftFun1 z3_simplify
@@ -1979,6 +2005,13 @@ getBv c a signed = getInt c =<< mkBv2int c a signed
 
 -- TODO Modifiers
 
+substituteVars :: Context -> AST -> [AST] -> IO AST
+substituteVars ctx a vars =
+  marshal z3_substitute_vars ctx $ \f ->
+    h2c a $ \aPtr ->
+    marshalArrayLen vars $ \varsNum varsArr ->
+      f aPtr varsNum varsArr
+
 ---------------------------------------------------------------------
 -- Models
 
@@ -2006,62 +2039,9 @@ modelEval ctx m a b =
         peekAST _p False = return Nothing
         peekAST  p True  = fmap Just . c2h ctx =<< peek p
 
-modelGetConstInterp :: Context -> Model -> FuncDecl -> IO (Maybe AST)
-modelGetConstInterp ctx m fd = marshal z3_model_get_const_interp ctx $ \f ->
-  h2c m $ \mPtr ->
-  h2c fd $ \fdPtr ->
-    f mPtr fdPtr
+-- TODO: Z3_model_get_const_interp
 
-modelGetFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
-modelGetFuncInterp = getFuncInterp
-
--- | Return the interpretation of the function f in the model m.
--- Return NULL, if the model does not assign an interpretation for f.
--- That should be interpreted as: the f does not matter.
-getFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
-getFuncInterp ctx m fd = marshal z3_model_get_func_interp ctx $ \f ->
-  h2c m $ \mPtr ->
-  h2c fd $ \fdPtr ->
-    f mPtr fdPtr
-
-modelHasInterp :: Context -> Model -> FuncDecl -> IO Bool
-modelHasInterp = liftFun2 z3_model_has_interp
-
-modelGetNumConsts :: Context -> Model -> IO Int
-modelGetNumConsts = liftFun1 z3_model_get_num_consts
-
-modelGetConstDecl :: Context -> Model -> Int -> IO FuncDecl
-modelGetConstDecl = liftFun2 z3_model_get_const_decl
-
-modelGetConstDecls :: Context -> Model -> IO [FuncDecl]
-modelGetConstDecls ctx m =
-  do n <- modelGetNumConsts ctx m
-     mapM (modelGetConstDecl ctx m) [0..n-1]
-
-modelGetNumFuncs :: Context -> Model -> IO Int
-modelGetNumFuncs = liftFun1 z3_model_get_num_funcs
-
-modelGetFuncDecl :: Context -> Model -> Int -> IO FuncDecl
-modelGetFuncDecl = liftFun2 z3_model_get_func_decl
-
-modelGetFuncDecls :: Context -> Model -> IO [FuncDecl]
-modelGetFuncDecls ctx m =
-  do n <- modelGetNumFuncs ctx m
-     mapM (modelGetFuncDecl ctx m) [0..n-1]
-
-modelGetNumSorts :: Context -> Model -> IO Int
-modelGetNumSorts = liftFun1 z3_model_get_num_sorts
-
-modelGetSort :: Context -> Model -> Int -> IO Sort
-modelGetSort = liftFun2 z3_model_get_sort
-
-modelGetSorts :: Context -> Model -> IO [Sort]
-modelGetSorts ctx m =
-  do n <- modelGetNumSorts ctx m
-     mapM (modelGetSort ctx m) [0..n-1]
-
-modelGetSortUniverse :: Context -> Model -> Sort -> IO [AST]
-modelGetSortUniverse = liftFun2 z3_model_get_sort_universe
+-- TODO: Z3_model_has_interp
 
 -- | Evaluate an array as a function, if possible.
 evalArray :: Context -> Model -> AST -> IO (Maybe FuncModel)
@@ -2108,6 +2088,15 @@ getEntryArgs :: Context -> FuncEntry -> IO [AST]
 getEntryArgs ctx entry =
     do n <- funcEntryGetNumArgs ctx entry
        mapM (funcEntryGetArg ctx entry) [0..n-1]
+
+-- | Return the interpretation of the function f in the model m.
+-- Return NULL, if the model does not assign an interpretation for f.
+-- That should be interpreted as: the f does not matter.
+getFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
+getFuncInterp ctx m fd = marshal z3_model_get_func_interp ctx $ \f ->
+  h2c m $ \mPtr ->
+  h2c fd $ \fdPtr ->
+    f mPtr fdPtr
 
 -- | Return the number of entries in the given function interpretation.
 funcInterpGetNumEntries :: Context -> FuncInterp -> IO Int
@@ -2309,6 +2298,61 @@ benchmarkToSMTLibString ctx name logic status attr assump form =
       f namePtr logicPtr statusPtr attrPtr assumpNum assumpArr formPtr
 
 ---------------------------------------------------------------------
+-- Tactics
+
+mkTactic :: Context -> String -> IO Tactic
+mkTactic = liftFun1 z3_mk_tactic
+
+andThenTactic :: Context -> Tactic -> Tactic -> IO Tactic
+andThenTactic = liftFun2 z3_tactic_and_then
+
+orElseTactic :: Context -> Tactic -> Tactic -> IO Tactic
+orElseTactic = liftFun2 z3_tactic_or_else
+
+skipTactic :: Context -> IO Tactic
+skipTactic = liftFun0 z3_tactic_skip
+
+tryForTactic :: Context -> Tactic -> Int -> IO Tactic
+tryForTactic = liftFun2 z3_tactic_try_for
+
+mkQuantifierEliminationTactic :: Context -> IO Tactic
+mkQuantifierEliminationTactic ctx = mkTactic ctx "qe"
+
+mkAndInverterGraphTactic :: Context -> IO Tactic
+mkAndInverterGraphTactic ctx = mkTactic ctx "aig"
+
+applyTactic :: Context -> Tactic -> Goal -> IO ApplyResult
+applyTactic = liftFun2 z3_tactic_apply
+
+getApplyResultNumSubgoals :: Context -> ApplyResult -> IO Int
+getApplyResultNumSubgoals = liftFun1 z3_apply_result_get_num_subgoals
+
+getApplyResultSubgoal :: Context -> ApplyResult -> Int -> IO Goal
+getApplyResultSubgoal = liftFun2 z3_apply_result_get_subgoal
+
+getApplyResultSubgoals :: Context -> ApplyResult -> IO [Goal]
+getApplyResultSubgoals ctx a = do
+  n <- getApplyResultNumSubgoals ctx a
+  T.forM [0..n-1] (getApplyResultSubgoal ctx a)
+
+mkGoal :: Context -> Bool -> Bool -> Bool -> IO Goal
+mkGoal = liftFun3 z3_mk_goal
+
+goalAssert :: Context -> Goal -> AST -> IO ()
+goalAssert = liftFun2 z3_goal_assert
+
+getGoalSize :: Context -> Goal -> IO Int
+getGoalSize = liftFun1 z3_goal_size
+
+getGoalFormula :: Context -> Goal -> Int -> IO AST
+getGoalFormula = liftFun2 z3_goal_formula
+
+getGoalFormulas :: Context -> Goal -> IO [AST]
+getGoalFormulas ctx g = do
+  n <- getGoalSize ctx g
+  T.forM [0..n-1] (getGoalFormula ctx g)
+
+---------------------------------------------------------------------
 -- Parser interface
 
 -- TODO
@@ -2327,7 +2371,7 @@ data Z3Error = Z3Error
   deriving Typeable
 
 instance Show Z3Error where
-  show (Z3Error _ s) = s
+  show (Z3Error _ s) = "Z3 error: " ++ s
 
 -- | Z3 error codes.
 data Z3ErrorCode = SortError | IOB | InvalidArg | ParserError | NoParser
@@ -2395,63 +2439,18 @@ getVersion =
     return $ Version minor major build revision
 
 ---------------------------------------------------------------------
--- Fixedpoint facilities
-
-newtype Fixedpoint = Fixedpoint { unFixedpoint :: ForeignPtr Z3_fixedpoint }
-    deriving Eq
-
-instance Marshal Fixedpoint (Ptr Z3_fixedpoint) where
-  c2h = mkC2hRefCount Fixedpoint z3_fixedpoint_inc_ref z3_fixedpoint_dec_ref
-  h2c fp = withForeignPtr (unFixedpoint fp)
-
-mkFixedpoint :: Context -> IO Fixedpoint
-mkFixedpoint = liftFun0 z3_mk_fixedpoint
-
-fixedpointPush :: Context -> Fixedpoint -> IO ()
-fixedpointPush = liftFun1 z3_fixedpoint_push
-
-fixedpointPop :: Context -> Fixedpoint -> IO ()
-fixedpointPop = liftFun1 z3_fixedpoint_pop
-
-fixedpointAddRule :: Context -> Fixedpoint -> AST -> Symbol -> IO ()
-fixedpointAddRule = liftFun3 z3_fixedpoint_add_rule
-
-fixedpointSetParams :: Context -> Fixedpoint -> Params -> IO ()
-fixedpointSetParams = liftFun2 z3_fixedpoint_set_params
-
-fixedpointRegisterRelation :: Context -> Fixedpoint -> FuncDecl -> IO ()
-fixedpointRegisterRelation = liftFun2 z3_fixedpoint_register_relation
-
-fixedpointRegisterVariable :: Context -> Fixedpoint -> FuncDecl -> IO ()
-fixedpointRegisterVariable = liftFun2 z3_fixedpoint_register_variable
-
-fixedpointQueryRelations :: Context -> Fixedpoint -> [FuncDecl] -> IO Result
-fixedpointQueryRelations ctx fixedpoint fds =
-  marshal z3_fixedpoint_query_relations ctx $ \f ->
-    h2c fixedpoint $ \fixedpointPtr ->
-    marshalArrayLen fds $ \fdsNum fdsArr ->
-      f fixedpointPtr fdsNum fdsArr
-
-fixedpointGetAnswer :: Context -> Fixedpoint -> IO AST
-fixedpointGetAnswer = liftFun1 z3_fixedpoint_get_answer
-
-fixedpointGetAssertions :: Context -> Fixedpoint -> IO [AST]
-fixedpointGetAssertions = liftFun1 z3_fixedpoint_get_assertions
-
-fixedpointGetRefutation :: Context -> Fixedpoint -> IO Model
-fixedpointGetRefutation = liftFun1 z3_fixedpoint_get_refutation
-
-fixedpointDisplayCertificate :: Context -> Fixedpoint -> IO ()
-fixedpointDisplayCertificate = liftFun1 z3_fixedpoint_display_certificate
-
-fixedpointGetModel :: Context -> Fixedpoint -> IO Model
-fixedpointGetModel = liftFun1 z3_fixedpoint_get_model
-
-
----------------------------------------------------------------------
 -- Externalm Theory Plugins
 
 -- TODO
+
+---------------------------------------------------------------------
+-- Fixedpoint facilities
+
+-- TODO
+
+-- AST vectors ?
+
+-- AST maps ?
 
 ---------------------------------------------------------------------
 -- Goals
@@ -2798,19 +2797,6 @@ solverCheckAndGetModel ctx solver =
                   _     -> Just <$> solverGetModel ctx solver
      return (res, mbModel)
 
-getRange :: Context -> FuncDecl -> IO Sort
-getRange = liftFun1 z3_get_range
-
-getDomainSize :: Context -> FuncDecl -> IO Int
-getDomainSize = liftFun1 z3_get_domain_size
-
-getDomainN :: Context -> FuncDecl -> Int -> IO Sort
-getDomainN = liftFun2 z3_get_domain
-
-getDomain :: Context -> FuncDecl -> IO [Sort]
-getDomain ctx fd =
-  do n <- getDomainSize ctx fd
-     mapM (getDomainN ctx fd) [0..n-1]
 ---------------------------------------------------------------------
 -- Marshalling
 
@@ -3021,6 +3007,17 @@ instance Marshal Solver (Ptr Z3_solver) where
   c2h = mkC2hRefCount Solver z3_solver_inc_ref z3_solver_dec_ref
   h2c slv = withForeignPtr (unSolver slv)
 
+instance Marshal Tactic (Ptr Z3_tactic) where
+  c2h = mkC2hRefCount Tactic z3_tactic_inc_ref z3_tactic_dec_ref
+  h2c tac = withForeignPtr (unTactic tac)
+
+instance Marshal ApplyResult (Ptr Z3_apply_result) where
+  c2h = mkC2hRefCount ApplyResult z3_apply_result_inc_ref z3_apply_result_dec_ref
+  h2c apl = withForeignPtr (unApplyResult apl)
+
+instance Marshal Goal (Ptr Z3_goal) where
+  c2h = mkC2hRefCount Goal z3_goal_inc_ref z3_goal_dec_ref
+  h2c goa = withForeignPtr (unGoal goa)
 
 marshal :: Marshal rh rc => (Ptr Z3_context -> t) ->
               Context -> (t -> IO rc) -> IO rh
