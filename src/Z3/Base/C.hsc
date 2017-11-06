@@ -1000,6 +1000,33 @@ foreign import ccall unsafe "Z3_model_eval"
                   -> Ptr (Ptr Z3_ast)
                   -> IO Z3_bool
 
+foreign import ccall unsafe "Z3_model_get_const_interp"
+    z3_model_get_const_interp :: Ptr Z3_context -> Ptr Z3_model -> Ptr Z3_func_decl -> IO (Ptr Z3_ast)
+
+foreign import ccall unsafe "Z3_model_has_interp"
+    z3_model_has_interp :: Ptr Z3_context -> Ptr Z3_model -> Ptr Z3_func_decl -> IO Z3_bool
+
+foreign import ccall unsafe "Z3_model_get_num_consts"
+    z3_model_get_num_consts :: Ptr Z3_context -> Ptr Z3_model -> IO CUInt
+
+foreign import ccall unsafe "Z3_model_get_const_decl"
+    z3_model_get_const_decl :: Ptr Z3_context -> Ptr Z3_model -> CUInt -> IO (Ptr Z3_func_decl)
+
+foreign import ccall unsafe "Z3_model_get_num_funcs"
+    z3_model_get_num_funcs :: Ptr Z3_context -> Ptr Z3_model -> IO CUInt
+
+foreign import ccall unsafe "Z3_model_get_func_decl"
+    z3_model_get_func_decl :: Ptr Z3_context -> Ptr Z3_model -> CUInt -> IO (Ptr Z3_func_decl)
+
+foreign import ccall unsafe "Z3_model_get_num_sorts"
+    z3_model_get_num_sorts :: Ptr Z3_context -> Ptr Z3_model -> IO CUInt
+
+foreign import ccall unsafe "Z3_model_get_sort"
+    z3_model_get_sort :: Ptr Z3_context -> Ptr Z3_model -> CUInt -> IO (Ptr Z3_sort)
+
+foreign import ccall unsafe "Z3_model_get_sort_universe"
+    z3_model_get_sort_universe :: Ptr Z3_context -> Ptr Z3_model -> Ptr Z3_sort -> IO (Ptr Z3_ast_vector)
+
 -- | Reference: <http://z3prover.github.io/api/html/group__capi.html#ga4674da67d226bfb16861829b9f129cfa>
 foreign import ccall unsafe "Z3_is_as_array"
     z3_is_as_array :: Ptr Z3_context

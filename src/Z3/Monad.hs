@@ -266,6 +266,11 @@ module Z3.Monad
 
   -- * Models
   , modelEval
+  , modelGetFuncInterp
+  , modelGetConstInterp
+  , modelGetConstDecls
+  , modelGetFuncDecls
+  , modelGetSorts
   , evalArray
   , getFuncInterp
   , isAsArray
@@ -1682,6 +1687,21 @@ modelEval :: MonadZ3 z3 => Model -> AST
              -> Bool  -- ^ Model completion?
              -> z3 (Maybe AST)
 modelEval = liftFun3 Base.modelEval
+
+modelGetFuncInterp :: MonadZ3 z3 => Model -> FuncDecl -> z3 (Maybe FuncInterp)
+modelGetFuncInterp = liftFun2 Base.modelGetFuncInterp
+
+modelGetConstInterp :: MonadZ3 z3 => Model -> FuncDecl -> z3 (Maybe AST)
+modelGetConstInterp = liftFun2 Base.modelGetConstInterp
+
+modelGetConstDecls :: MonadZ3 z3 => Model -> z3 [FuncDecl]
+modelGetConstDecls = liftFun1 Base.modelGetConstDecls
+
+modelGetFuncDecls :: MonadZ3 z3 => Model -> z3 [FuncDecl]
+modelGetFuncDecls = liftFun1 Base.modelGetFuncDecls
+
+modelGetSorts :: MonadZ3 z3 => Model -> z3 [Sort]
+modelGetSorts = liftFun1 Base.modelGetSorts
 
 -- | Get array as a list of argument/value pairs, if it is
 -- represented as a function (ie, using as-array).

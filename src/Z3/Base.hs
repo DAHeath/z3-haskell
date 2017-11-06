@@ -307,6 +307,19 @@ module Z3.Base (
 
   -- * Models
   , modelEval
+  , modelGetConstInterp
+  , modelHasInterp
+  , modelGetFuncInterp
+  , modelGetNumConsts
+  , modelGetConstDecl
+  , modelGetConstDecls
+  , modelGetNumFuncs
+  , modelGetFuncDecl
+  , modelGetFuncDecls
+  , modelGetNumSorts
+  , modelGetSort
+  , modelGetSorts
+  , modelGetSortUniverse
   , evalArray
   , getFuncInterp
   , isAsArray
@@ -2055,7 +2068,53 @@ modelEval ctx m a b =
         peekAST _p False = return Nothing
         peekAST  p True  = fmap Just . c2h ctx =<< peek p
 
--- TODO: Z3_model_get_const_interp
+modelGetConstInterp :: Context -> Model -> FuncDecl -> IO (Maybe AST)
+modelGetConstInterp ctx m fd = marshal z3_model_get_const_interp ctx $ \f ->
+  h2c m $ \mPtr ->
+  h2c fd $ \fdPtr ->
+    f mPtr fdPtr
+
+modelGetFuncInterp :: Context -> Model -> FuncDecl -> IO (Maybe FuncInterp)
+modelGetFuncInterp = getFuncInterp
+
+modelHasInterp :: Context -> Model -> FuncDecl -> IO Bool
+modelHasInterp = liftFun2 z3_model_has_interp
+
+modelGetNumConsts :: Context -> Model -> IO Int
+modelGetNumConsts = liftFun1 z3_model_get_num_consts
+
+modelGetConstDecl :: Context -> Model -> Int -> IO FuncDecl
+modelGetConstDecl = liftFun2 z3_model_get_const_decl
+
+modelGetConstDecls :: Context -> Model -> IO [FuncDecl]
+modelGetConstDecls ctx m =
+  do n <- modelGetNumConsts ctx m
+     mapM (modelGetConstDecl ctx m) [0..n-1]
+
+modelGetNumFuncs :: Context -> Model -> IO Int
+modelGetNumFuncs = liftFun1 z3_model_get_num_funcs
+
+modelGetFuncDecl :: Context -> Model -> Int -> IO FuncDecl
+modelGetFuncDecl = liftFun2 z3_model_get_func_decl
+
+modelGetFuncDecls :: Context -> Model -> IO [FuncDecl]
+modelGetFuncDecls ctx m =
+  do n <- modelGetNumFuncs ctx m
+     mapM (modelGetFuncDecl ctx m) [0..n-1]
+
+modelGetNumSorts :: Context -> Model -> IO Int
+modelGetNumSorts = liftFun1 z3_model_get_num_sorts
+
+modelGetSort :: Context -> Model -> Int -> IO Sort
+modelGetSort = liftFun2 z3_model_get_sort
+
+modelGetSorts :: Context -> Model -> IO [Sort]
+modelGetSorts ctx m =
+  do n <- modelGetNumSorts ctx m
+     mapM (modelGetSort ctx m) [0..n-1]
+
+modelGetSortUniverse :: Context -> Model -> Sort -> IO [AST]
+modelGetSortUniverse = liftFun2 z3_model_get_sort_universe
 
 -- TODO: Z3_model_has_interp
 
