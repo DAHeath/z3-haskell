@@ -894,6 +894,9 @@ foreign import ccall unsafe "Z3_get_domain"
 foreign import ccall unsafe "Z3_get_range"
     z3_get_range :: Ptr Z3_context -> Ptr Z3_func_decl -> IO (Ptr Z3_sort)
 
+foreign import ccall unsafe "Z3_get_domain_size"
+    z3_get_domain_size :: Ptr Z3_context -> Ptr Z3_func_decl -> IO CUInt
+
 -- | Reference: <http://z3prover.github.io/api/html/group__capi.html#gaf9345fd0822d7e9928dd4ab14a09765b>
 foreign import ccall unsafe "Z3_to_app"
   z3_to_app :: Ptr Z3_context -> Ptr Z3_ast -> IO (Ptr Z3_app)

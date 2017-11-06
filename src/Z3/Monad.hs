@@ -1521,12 +1521,9 @@ getDeclName = liftFun1 Base.getDeclName
 getArity :: MonadZ3 z3 => FuncDecl -> z3 Int
 getArity = liftFun1 Base.getArity
 
--- | Returns the sort of the i-th parameter of the given function declaration
-getDomain :: MonadZ3 z3
-             => FuncDecl         -- ^ A function declaration
-             -> Int              -- ^ i
-             -> z3 Sort
-getDomain = liftFun2 Base.getDomain
+-- | Returns the domain of the given declaration.
+getDomain :: MonadZ3 z3 => FuncDecl -> z3 [Sort]
+getDomain = liftFun1 Base.getDomain
 
 -- | Returns the range of the given declaration.
 getRange :: MonadZ3 z3 => FuncDecl -> z3 Sort

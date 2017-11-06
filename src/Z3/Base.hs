@@ -1792,11 +1792,19 @@ getArity :: Context -> FuncDecl -> IO Int
 getArity = liftFun1 z3_get_arity
 
 -- | Returns the sort of the i-th parameter of the given function declaration
-getDomain :: Context
+getDomainN :: Context
              -> FuncDecl         -- ^ A function declaration
              -> Int              -- ^ i
              -> IO Sort
-getDomain = liftFun2 z3_get_domain
+getDomainN = liftFun2 z3_get_domain
+
+getDomainSize :: Context -> FuncDecl -> IO Int
+getDomainSize = liftFun1 z3_get_domain_size
+
+getDomain :: Context -> FuncDecl -> IO [Sort]
+getDomain ctx fd =
+  do n <- getDomainSize ctx fd
+     mapM (getDomainN ctx fd) [0..n-1]
 
 -- | Returns the range of the given declaration.
 getRange :: Context -> FuncDecl -> IO Sort
