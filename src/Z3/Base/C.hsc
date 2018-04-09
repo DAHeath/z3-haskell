@@ -197,6 +197,9 @@ foreign import ccall safe "Z3_set_param_value"
 foreign import ccall safe "Z3_mk_context_rc"
     z3_mk_context_rc :: Ptr Z3_config -> IO (Ptr Z3_context)
 
+foreign import ccall safe "Z3_mk_context"
+    z3_mk_context :: Ptr Z3_config -> IO (Ptr Z3_context)
+
 -- | Reference: <http://z3prover.github.io/api/html/group__capi.html#ga556eae80ed43ab13e1e7dc3b38c35200>
 foreign import ccall safe "Z3_del_context"
     z3_del_context :: Ptr Z3_context -> IO ()

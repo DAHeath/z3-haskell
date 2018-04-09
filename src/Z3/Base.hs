@@ -634,7 +634,8 @@ mkContextWith mkCtx cfg = do
 -- /Z3_del_context/ is called by Haskell's garbage collector before
 -- freeing the 'Context' object.
 mkContext :: Config -> IO Context
-mkContext = mkContextWith z3_mk_context_rc
+-- mkContext = mkContextWith z3_mk_context_rc
+mkContext = mkContextWith z3_mk_context
 
 -- TODO: Z3_update_param_value
 -- TODO: Z3_interrupt
@@ -3017,11 +3018,12 @@ mkC2hRefCount :: (ForeignPtr c -> h)
                    -> Context -> Ptr c -> IO h
 mkC2hRefCount mk incRef decRef ctx xPtr =
   withContext ctx $ \ctxPtr -> do
-    incRef ctxPtr xPtr
-    contextIncRef ctx
+    -- incRef ctxPtr xPtr
+    -- contextIncRef ctx
     let xFinalizer = do
-        decRef ctxPtr xPtr
-        contextDecRef ctxPtr (refCount ctx)
+        -- decRef ctxPtr xPtr
+        -- contextDecRef ctxPtr (refCount ctx)
+        pure ()
     mk <$> newForeignPtr xPtr xFinalizer
 
 dummy_inc_ref :: Z3IncRefFun c
