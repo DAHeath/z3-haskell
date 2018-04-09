@@ -529,7 +529,11 @@ instance MonadZ3 Z3 where
 -- | Eval a Z3 script.
 evalZ3With :: Maybe Logic -> Opts -> Z3 a -> IO a
 evalZ3With mbLogic opts (Z3 s) = do
-  env <- GL.lock (newEnv mbLogic opts)
+  env <- GL.lock (do
+    putStrLn "HERE"
+    e <- newEnv mbLogic opts
+    putStrLn "THERE"
+    pure e)
   runReaderT s env
 
 -- | Eval a Z3 script with default configuration options.
