@@ -628,7 +628,6 @@ mkContextWith mkCtx cfg = do
 -- /Z3_del_context/ is called by Haskell's garbage collector before
 -- freeing the 'Context' object.
 mkContext :: Config -> IO Context
--- mkContext = mkContextWith z3_mk_context_rc
 mkContext = mkContextWith z3_mk_context
 
 -- TODO: Z3_update_param_value

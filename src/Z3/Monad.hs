@@ -428,6 +428,8 @@ import Data.Word ( Word, Word64 )
 import Data.Traversable ( Traversable )
 import qualified Data.Traversable as T
 
+import qualified System.GlobalLock as GL
+
 ---------------------------------------------------------------------
 -- The Z3 monad-class
 
@@ -527,7 +529,7 @@ instance MonadZ3 Z3 where
 -- | Eval a Z3 script.
 evalZ3With :: Maybe Logic -> Opts -> Z3 a -> IO a
 evalZ3With mbLogic opts (Z3 s) = do
-  env <- newEnv mbLogic opts
+  env <- GL.lock (newEnv mbLogic opts)
   runReaderT s env
 
 -- | Eval a Z3 script with default configuration options.
