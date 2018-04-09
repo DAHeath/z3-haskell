@@ -390,7 +390,7 @@ module Z3.Base (
   , fixedpointAddRule
   , fixedpointSetParams
   , fixedpointRegisterRelation
-  , fixedpointRegisterVariable
+  -- , fixedpointRegisterVariable
   , fixedpointQueryRelations
   , fixedpointGetAnswer
   , fixedpointGetAssertions
@@ -2340,8 +2340,6 @@ setASTPrintMode ctx mode = withContextError ctx $ \ctxPtr ->
          z3_set_ast_print_mode ctxPtr z3_print_smtlib_full
        Z3_PRINT_LOW_LEVEL ->
          z3_set_ast_print_mode ctxPtr z3_print_low_level
-       Z3_PRINT_SMTLIB_COMPLIANT ->
-         z3_set_ast_print_mode ctxPtr z3_print_smtlib_compliant
        Z3_PRINT_SMTLIB2_COMPLIANT ->
          z3_set_ast_print_mode ctxPtr z3_print_smtlib2_compliant
 
@@ -2562,8 +2560,8 @@ fixedpointSetParams = liftFun2 z3_fixedpoint_set_params
 fixedpointRegisterRelation :: Context -> Fixedpoint -> FuncDecl -> IO ()
 fixedpointRegisterRelation = liftFun2 z3_fixedpoint_register_relation
 
-fixedpointRegisterVariable :: Context -> Fixedpoint -> FuncDecl -> IO ()
-fixedpointRegisterVariable = liftFun2 z3_fixedpoint_register_variable
+-- fixedpointRegisterVariable :: Context -> Fixedpoint -> FuncDecl -> IO ()
+-- fixedpointRegisterVariable = liftFun2 z3_fixedpoint_register_variable
 
 fixedpointQueryRelations :: Context -> Fixedpoint -> [FuncDecl] -> IO Result
 fixedpointQueryRelations ctx fixedpoint fds =

@@ -340,7 +340,7 @@ module Z3.Monad
   , fixedpointAddRule
   , fixedpointSetParams
   , fixedpointRegisterRelation
-  , fixedpointRegisterVariable
+  -- , fixedpointRegisterVariable
   , fixedpointQueryRelations
   , fixedpointGetAnswer
   , fixedpointGetAssertions
@@ -518,13 +518,13 @@ data Z3Env
   = Z3Env {
       envSolver     :: Base.Solver
     , envContext    :: Base.Context
-    , envFixedpoint :: Base.Fixedpoint
+    -- , envFixedpoint :: Base.Fixedpoint
     }
 
 instance MonadZ3 Z3 where
   getSolver     = Z3 $ asks envSolver
   getContext    = Z3 $ asks envContext
-  getFixedpoint = Z3 $ asks envFixedpoint
+  -- getFixedpoint = Z3 $ asks envFixedpoint
 
 -- | Eval a Z3 script.
 evalZ3With :: Maybe Logic -> Opts -> Z3 a -> IO a
@@ -543,8 +543,9 @@ newEnvWith mkContext mbLogic opts =
     setOpts cfg opts
     ctx <- mkContext cfg
     solver <- maybe (Base.mkSolver ctx) (Base.mkSolverForLogic ctx) mbLogic
-    fixedpoint <- Base.mkFixedpoint ctx
-    return $ Z3Env solver ctx fixedpoint
+    -- fixedpoint <- Base.mkFixedpoint ctx
+    -- return $ Z3Env solver ctx fixedpoint
+    return $ Z3Env solver ctx
 
 -- | Create a new Z3 environment.
 newEnv :: Maybe Logic -> Opts -> IO Z3Env
@@ -1963,8 +1964,8 @@ fixedpointSetParams = liftFixedpoint1 Base.fixedpointSetParams
 fixedpointRegisterRelation :: MonadZ3 z3 => FuncDecl -> z3 ()
 fixedpointRegisterRelation = liftFixedpoint1 Base.fixedpointRegisterRelation
 
-fixedpointRegisterVariable :: MonadZ3 z3 => FuncDecl -> z3 ()
-fixedpointRegisterVariable = liftFixedpoint1 Base.fixedpointRegisterVariable
+-- fixedpointRegisterVariable :: MonadZ3 z3 => FuncDecl -> z3 ()
+-- fixedpointRegisterVariable = liftFixedpoint1 Base.fixedpointRegisterVariable
 
 fixedpointQueryRelations :: MonadZ3 z3 => [FuncDecl] -> z3 Result
 fixedpointQueryRelations = liftFixedpoint1 Base.fixedpointQueryRelations
