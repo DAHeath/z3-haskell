@@ -3018,11 +3018,11 @@ mkC2hRefCount :: (ForeignPtr c -> h)
                    -> Context -> Ptr c -> IO h
 mkC2hRefCount mk incRef decRef ctx xPtr =
   withContext ctx $ \ctxPtr -> do
-    -- incRef ctxPtr xPtr
-    -- contextIncRef ctx
+    incRef ctxPtr xPtr
+    contextIncRef ctx
     let xFinalizer = do
-        -- decRef ctxPtr xPtr
-        -- contextDecRef ctxPtr (refCount ctx)
+        decRef ctxPtr xPtr
+        contextDecRef ctxPtr (refCount ctx)
         pure ()
     mk <$> newForeignPtr xPtr xFinalizer
 
