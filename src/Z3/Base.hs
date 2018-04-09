@@ -461,11 +461,7 @@ newtype Config = Config { unConfig :: Ptr Z3_config }
     deriving Eq
 
 -- | A Z3 /logical context/.
-data Context =
-    Context {
-      unContext :: ForeignPtr Z3_context
-    , refCount  :: !(IORef Word)
-    }
+newtype Context = Context { unContext :: ForeignPtr Z3_context }
     deriving Eq
 
 -- | A Z3 /symbol/.
@@ -625,9 +621,7 @@ mkContextWith :: (Ptr Z3_config -> IO (Ptr Z3_context)) -> Config -> IO Context
 mkContextWith mkCtx cfg = do
   ctxPtr <- mkCtx (unConfig cfg)
   z3_set_error_handler ctxPtr nullFunPtr
-  count <- newIORef 1
-  Context <$> newForeignPtr ctxPtr (contextDecRef ctxPtr count)
-          <*> pure count
+  Context <$> newForeignPtr ctxPtr (z3_del_context ctxPtr)
 
 -- | Create a context using the given configuration.
 --
@@ -639,19 +633,6 @@ mkContext = mkContextWith z3_mk_context
 
 -- TODO: Z3_update_param_value
 -- TODO: Z3_interrupt
-
--------------------------------------------------
--- Reference counting of Context
-
-contextIncRef :: Context -> IO ()
-contextIncRef ctx = atomicModifyIORef' (refCount ctx) $ \n ->
-  (n+1, ())
-
-contextDecRef :: Ptr Z3_context -> IORef Word -> IO ()
-contextDecRef ctxPtr count = join $ atomicModifyIORef' count $ \n ->
-  if n > 1
-    then (n-1, return ())
-    else (  0, z3_del_context ctxPtr)
 
 ---------------------------------------------------------------------
 -- Parameters
@@ -3019,10 +3000,8 @@ mkC2hRefCount :: (ForeignPtr c -> h)
 mkC2hRefCount mk incRef decRef ctx xPtr =
   withContext ctx $ \ctxPtr -> do
     incRef ctxPtr xPtr
-    contextIncRef ctx
     let xFinalizer = do
         decRef ctxPtr xPtr
-        contextDecRef ctxPtr (refCount ctx)
         pure ()
     mk <$> newForeignPtr xPtr xFinalizer
 
